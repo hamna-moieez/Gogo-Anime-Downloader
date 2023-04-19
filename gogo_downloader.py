@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 import webbrowser, time
 import pyautogui
+from glob import glob
 
 class GogoDownloader:
     def __init__(self, base_url, anime):
@@ -26,6 +27,7 @@ class GogoDownloader:
         return eps_count
     
     def gui_magic(self):
+        # need to make adaptive.
         time.sleep(2)
         pyautogui.moveTo(1150, 451)
         pyautogui.click()
@@ -33,8 +35,28 @@ class GogoDownloader:
         pyautogui.press('enter')
         time.sleep(3)
         pyautogui.hotkey('command', 'w')
+    
+    def check_for_issues(self, directory, rng, typ):
+        """checks if everything is downloaded properly."""
+        available_episodes = [x for x in glob(directory + "*.mp4")]
+        available_episodes = [x.split('/')[-1].split('.')[1] for x in available_episodes]
+        if typ == "all" or typ == "range":
+            start, end = rng
+            eps_to_download = [str(x) for x in range(start, end+1)]
+            missed_eps = list(set(eps_to_download).difference(available_episodes))
+            print(f"Missed Eps: {missed_eps}")
+        else:
+            _, eps_number = rng
+            missed_eps = list(set([str(eps_number)]).difference(available_episodes))
+            print(f"Missed Eps: {missed_eps}")
+        return missed_eps
 
-    def download_one_episode(self, eps_number):
+    def re_download(self, missed_eps):
+        """redundancy check to avoid missing any episode in case of internet issues."""
+        for eps in missed_eps:
+            self.download_episode(eps)
+
+    def download_episode(self, eps_number):
         """download one single episode."""
         print(f"Downloading Episode: {eps_number}")
         download_url = self.download_episode_link + eps_number
@@ -48,19 +70,15 @@ class GogoDownloader:
         """downloads all episodes available to date (1 - n)."""
         print(f"Downloading all {total_eps} episodes.")
         for eps in range(1, total_eps+1):
-            self.download_one_episode(str(eps))
+            self.download_episode(str(eps))
             time.sleep(3)
 
     def download_specific_episodes(self, start, end):
         """download specific episodes given start episode number and end episode number."""
         print(f"Downloading episodes in range from {start} to {end}.")
         for eps in range(start, end+1):
-            self.download_one_episode(str(eps))
+            self.download_episode(str(eps))
             time.sleep(3)
-            if eps % 10 == 0:
-                # mimic human like behavior
-                print(f"Waiting for 30 sec.")
-                time.sleep(30)
 
     def caller(self, typ="all", start=None, end=None, eps_number=None):
         """main caller method."""
@@ -69,11 +87,19 @@ class GogoDownloader:
         print(f"Total Episodes for {self.anime} are {total_episode_count}")
         
         if typ == "all":
-            self.download_all_episodes(total_episode_count)
+            # self.download_all_episodes(total_episode_count)
+            st, ed = 0, total_episode_count
         elif typ == "range":
-            self.download_specific_episodes(start, end)
+            # self.download_specific_episodes(start, end)
+            st, ed = start, end
         else:
-            self.download_one_episode(str(eps_number))
+            # self.download_episode(str(eps_number))
+            st, ed = None, eps_number
+        
+        missed_eps = self.check_for_issues("/Users/hamnamoieez/Desktop/OnePiece/", (st, ed), typ)
+        if missed_eps is not None:
+            self.re_download(missed_eps)
+
 
 g = GogoDownloader("https://gogoanime.cl/", "one-piece-dub")
-g.caller(typ="range", start=336, end=400)
+g.caller(typ="range", start=328, end=400)
